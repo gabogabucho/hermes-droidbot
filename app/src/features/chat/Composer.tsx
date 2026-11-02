@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useStore } from '@nanostores/react'
 import { t, useT } from '../../i18n'
 import { apiFetch } from '../../lib/api'
-import { request } from '../../lib/hermes/connection'
+import { ensureConnectionForAttachment, request } from '../../lib/hermes/connection'
 import { IconButton } from '../../ui/IconButton'
 import { chatMeta, chatSessionId, consumePendingDraft, running, sendMessage, stop } from './store'
 
@@ -66,6 +66,7 @@ export function Composer() {
     try {
       const dataUrl = await fileToDataUrl(file)
       const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+      await ensureConnectionForAttachment()
       if (file.type.startsWith('image/')) {
         await request('image.attach_bytes', { session_id: sid, content_base64: base64, filename: file.name })
       } else if (file.type === 'application/pdf') {

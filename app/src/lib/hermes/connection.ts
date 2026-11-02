@@ -7,6 +7,7 @@ import { getSessionToken } from './session-token'
 import type { RpcMethods, BackendGatewayEventMap, GatewayEvent } from './rpc-types'
 import { JsonRpcGatewayClient } from './vendor/json-rpc-gateway'
 import type { ServerRequestHandler } from './vendor/json-rpc-channel'
+import { ensureLiveConnection as ensureTransportLive } from './connection-probe'
 import { reconnectBackoffDelayMs } from './vendor/reconnect-backoff'
 
 export type ConnectionState = 'idle' | 'connecting' | 'open' | 'closed' | 'error'
@@ -243,6 +244,20 @@ function refreshSocket(): void {
   clearReconnectTimer()
   backoffAttempt = 0
   void runReconnect()
+}
+
+/** Probe and, only on a transport-close error, restore the gateway before upload. */
+export async function ensureConnectionForAttachment(): Promise<void> {
+  await ensureTransportLive({
+    isOpen: () => connectionState.get() === 'open',
+    // Hermes answers gateway.ping before normal RPC dispatch; it has no side effect.
+    ping: () => client.request('gateway.ping', {}, 5_000),
+    reconnect: async () => {
+      refreshSocket()
+      await whenOpen()
+    },
+    waitUntilOpen: whenOpen,
+  })
 }
 
 function wake(): void {
